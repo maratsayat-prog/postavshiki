@@ -1,366 +1,380 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { products, supplierOrders } from "@/lib/mock-data";
-import type { Category, Product, UserRole } from "@/lib/types";
 
-const categories: Category[] = [
-  "Все товары",
-  "Напитки",
-  "Снеки",
-  "Молочные продукты",
-  "Бытовая химия",
-  "Гигиена"
+type Panel = "content" | "design" | "settings";
+type MobileView = "edit" | "preview";
+type ThemeId = "warm" | "dark" | "sky";
+type RadiusId = "soft" | "round" | "square";
+type BlockKind = "product" | "service" | "link" | "promo";
+
+type CreatorBlock = {
+  id: number;
+  kind: BlockKind;
+  title: string;
+  subtitle: string;
+  price?: string;
+  badge?: string;
+  visible: boolean;
+};
+
+const themeOptions: Array<{ id: ThemeId; name: string; note: string }> = [
+  { id: "warm", name: "Тёплый", note: "Слоновая кость + коралл" },
+  { id: "dark", name: "Ночной", note: "Чёрный + лайм" },
+  { id: "sky", name: "Воздух", note: "Белый + синий" }
 ];
 
-const money = (value: number) =>
-  new Intl.NumberFormat("ru-KZ", { maximumFractionDigits: 0 }).format(value) + " ₸";
+const starterBlocks: CreatorBlock[] = [
+  {
+    id: 1,
+    kind: "product",
+    title: "Гайд: первые 100 продаж",
+    subtitle: "PDF · доступ сразу после оплаты",
+    price: "12 900 ₸",
+    badge: "Хит",
+    visible: true
+  },
+  {
+    id: 2,
+    kind: "service",
+    title: "Разбор вашего магазина",
+    subtitle: "45 минут · Google Meet",
+    price: "25 000 ₸",
+    visible: true
+  },
+  {
+    id: 3,
+    kind: "promo",
+    title: "Мои любимые инструменты",
+    subtitle: "Подборка сервисов с промокодами",
+    badge: "Партнёрское",
+    visible: true
+  },
+  {
+    id: 4,
+    kind: "link",
+    title: "Telegram-канал",
+    subtitle: "Коротко о продажах и продукте",
+    visible: true
+  }
+];
+
+const blockMeta: Record<BlockKind, { icon: string; label: string }> = {
+  product: { icon: "▣", label: "Товар" },
+  service: { icon: "◷", label: "Услуга" },
+  link: { icon: "↗", label: "Ссылка" },
+  promo: { icon: "✦", label: "Реклама" }
+};
 
 export default function Home() {
-  const [role, setRole] = useState<UserRole>("store");
-  const [category, setCategory] = useState<Category>("Все товары");
-  const [search, setSearch] = useState("");
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [notice, setNotice] = useState("");
+  const [panel, setPanel] = useState<Panel>("content");
+  const [mobileView, setMobileView] = useState<MobileView>("edit");
+  const [theme, setTheme] = useState<ThemeId>("warm");
+  const [radius, setRadius] = useState<RadiusId>("round");
+  const [blocks, setBlocks] = useState<CreatorBlock[]>(starterBlocks);
+  const [profile, setProfile] = useState({
+    name: "Марат Сайат",
+    handle: "marat",
+    description: "Помогаю предпринимателям строить продукты и расти в e-commerce."
+  });
+  const [published, setPublished] = useState(false);
+  const [toast, setToast] = useState("");
 
-  const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return products.filter((product) => {
-      const matchesCategory = category === "Все товары" || product.category === category;
-      const matchesSearch =
-        !query ||
-        product.name.toLowerCase().includes(query) ||
-        product.brand.toLowerCase().includes(query) ||
-        product.supplier.toLowerCase().includes(query);
-      return matchesCategory && matchesSearch;
-    });
-  }, [category, search]);
+  const visibleBlocks = useMemo(() => blocks.filter((block) => block.visible), [blocks]);
 
-  const cartLines = products.filter((product) => cart[product.id]);
-  const cartUnits = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
-  const cartTotal = cartLines.reduce((sum, product) => sum + product.price * cart[product.id], 0);
-  const supplierCount = new Set(cartLines.map((product) => product.supplier)).size;
-
-  function addToCart(product: Product) {
-    setCart((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }));
-    setNotice(`${product.name} добавлен в корзину`);
-    window.setTimeout(() => setNotice(""), 1800);
+  function notify(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 1800);
   }
 
-  function changeQuantity(productId: string, delta: number) {
-    setCart((current) => {
-      const nextQuantity = (current[productId] ?? 0) + delta;
-      const next = { ...current };
-      if (nextQuantity <= 0) delete next[productId];
-      else next[productId] = nextQuantity;
+  function addBlock(kind: BlockKind) {
+    const templates: Record<BlockKind, Omit<CreatorBlock, "id">> = {
+      product: {
+        kind,
+        title: "Новый цифровой продукт",
+        subtitle: "Файл или доступ после оплаты",
+        price: "9 900 ₸",
+        visible: true
+      },
+      service: {
+        kind,
+        title: "Новая консультация",
+        subtitle: "Онлайн-запись на удобное время",
+        price: "20 000 ₸",
+        visible: true
+      },
+      promo: {
+        kind,
+        title: "Рекламная рекомендация",
+        subtitle: "Добавьте ссылку и условия размещения",
+        badge: "Реклама",
+        visible: true
+      },
+      link: {
+        kind,
+        title: "Новая ссылка",
+        subtitle: "Добавьте короткое описание",
+        visible: true
+      }
+    };
+
+    setBlocks((current) => [...current, { ...templates[kind], id: Date.now() }]);
+    setPanel("content");
+    notify("Блок добавлен");
+  }
+
+  function toggleBlock(id: number) {
+    setBlocks((current) =>
+      current.map((block) => (block.id === id ? { ...block, visible: !block.visible } : block))
+    );
+  }
+
+  function removeBlock(id: number) {
+    setBlocks((current) => current.filter((block) => block.id !== id));
+    notify("Блок удалён");
+  }
+
+  function moveBlock(id: number, direction: -1 | 1) {
+    setBlocks((current) => {
+      const index = current.findIndex((block) => block.id === id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
       return next;
     });
   }
 
+  function publish() {
+    setPublished(true);
+    notify("Страница опубликована");
+  }
+
   return (
-    <main className="app-shell">
-      {notice && <div className="toast">✓ {notice}</div>}
+    <main className={`builder-app theme-${theme} radius-${radius}`}>
+      {toast && <div className="toast">{toast}</div>}
 
-      <header className="topbar">
-        <div className="brand-row">
-          <div className="logo-mark">Ж</div>
-          <div>
-            <div className="brand-name">Жақын</div>
-            <div className="brand-caption">Оптовые закупки рядом</div>
-          </div>
+      <header className="app-header">
+        <a className="brand" href="#" aria-label="Taply">
+          <span className="brand-mark">t</span>
+          <span className="brand-name">taply</span>
+        </a>
+
+        <div className="page-status">
+          <span className={published ? "status-dot live" : "status-dot"} />
+          <span>{published ? "Опубликовано" : "Черновик сохранён"}</span>
         </div>
 
-        <div className="role-switch" aria-label="Выбор режима">
-          <button className={role === "store" ? "active" : ""} onClick={() => setRole("store")}>
-            Я магазин
-          </button>
-          <button className={role === "supplier" ? "active" : ""} onClick={() => setRole("supplier")}>
-            Я поставщик
-          </button>
-        </div>
-
-        <div className="profile-chip">
-          <span className="avatar">М</span>
-          <span>
-            <b>{role === "store" ? "Магазин Арман" : "Food Distribution"}</b>
-            <small>Алматы</small>
-          </span>
+        <div className="header-actions">
+          <button className="ghost-button desktop-only" onClick={() => notify("Ссылка скопирована")}>Поделиться</button>
+          <button className="publish-button" onClick={publish}>{published ? "Обновить" : "Опубликовать"}</button>
+          <button className="avatar-button" aria-label="Профиль">М</button>
         </div>
       </header>
 
-      {role === "store" ? (
-        <StoreView
-          category={category}
-          setCategory={setCategory}
-          search={search}
-          setSearch={setSearch}
-          filteredProducts={filteredProducts}
-          cart={cart}
-          addToCart={addToCart}
-          changeQuantity={changeQuantity}
-          cartLines={cartLines}
-          cartUnits={cartUnits}
-          cartTotal={cartTotal}
-          supplierCount={supplierCount}
-        />
-      ) : (
-        <SupplierView />
-      )}
-    </main>
-  );
-}
-
-interface StoreViewProps {
-  category: Category;
-  setCategory: (category: Category) => void;
-  search: string;
-  setSearch: (value: string) => void;
-  filteredProducts: Product[];
-  cart: Record<string, number>;
-  addToCart: (product: Product) => void;
-  changeQuantity: (id: string, delta: number) => void;
-  cartLines: Product[];
-  cartUnits: number;
-  cartTotal: number;
-  supplierCount: number;
-}
-
-function StoreView(props: StoreViewProps) {
-  const {
-    category,
-    setCategory,
-    search,
-    setSearch,
-    filteredProducts,
-    cart,
-    addToCart,
-    changeQuantity,
-    cartLines,
-    cartUnits,
-    cartTotal,
-    supplierCount
-  } = props;
-
-  return (
-    <div className="page-grid">
-      <section className="content-column">
-        <div className="hero-panel">
-          <div>
-            <span className="eyebrow">B2B-маркетплейс для малого ритейла</span>
-            <h1>Закупайте товары у проверенных поставщиков</h1>
-            <p>Сравнивайте цены, собирайте одну корзину и получайте поставки прямо в магазин.</p>
+      <section className="workspace">
+        <aside className={`editor-shell ${mobileView === "edit" ? "mobile-active" : ""}`}>
+          <div className="editor-intro">
+            <div>
+              <span className="eyebrow">Ваша страница</span>
+              <h1>Соберите витрину за несколько минут</h1>
+            </div>
+            <div className="mini-metrics">
+              <div><b>1 284</b><span>просмотра</span></div>
+              <div><b>6,8%</b><span>конверсия</span></div>
+              <div><b>86 400 ₸</b><span>выручка</span></div>
+            </div>
           </div>
-          <div className="hero-metrics">
-            <div><b>38</b><span>поставщиков</span></div>
-            <div><b>4 820</b><span>товаров</span></div>
-            <div><b>1–2 дня</b><span>доставка</span></div>
-          </div>
-        </div>
 
-        <div className="toolbar">
-          <label className="search-field">
-            <span>⌕</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Найти товар, бренд или поставщика"
-            />
-          </label>
-          <button className="secondary-button">Фильтры <span className="filter-count">2</span></button>
-        </div>
+          <nav className="editor-tabs" aria-label="Разделы конструктора">
+            <button className={panel === "content" ? "active" : ""} onClick={() => setPanel("content")}>Контент</button>
+            <button className={panel === "design" ? "active" : ""} onClick={() => setPanel("design")}>Дизайн</button>
+            <button className={panel === "settings" ? "active" : ""} onClick={() => setPanel("settings")}>Настройки</button>
+          </nav>
 
-        <div className="category-row">
-          {categories.map((item) => (
-            <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="section-title-row">
-          <div>
-            <h2>{category === "Все товары" ? "Популярные товары" : category}</h2>
-            <p>{filteredProducts.length} предложений в наличии</p>
-          </div>
-          <select aria-label="Сортировка" defaultValue="popular">
-            <option value="popular">Сначала популярные</option>
-            <option value="price">Сначала дешевле</option>
-            <option value="delivery">Быстрая доставка</option>
-          </select>
-        </div>
-
-        <div className="product-grid">
-          {filteredProducts.map((product) => {
-            const quantity = cart[product.id] ?? 0;
-            return (
-              <article className="product-card" key={product.id}>
-                <div className="product-image">
-                  <span>{product.emoji}</span>
-                  {product.oldPrice && <em>Выгодно</em>}
-                </div>
-                <div className="product-meta">
-                  <span>{product.category}</span>
-                  <span>Остаток: {product.stock}</span>
-                </div>
-                <h3>{product.name}</h3>
-                <p className="supplier-name">{product.supplier}</p>
-                <div className="price-row">
-                  <div>
-                    <b>{money(product.price)}</b>
-                    {product.oldPrice && <s>{money(product.oldPrice)}</s>}
-                  </div>
-                  <small>{product.unit}</small>
-                </div>
-                <div className="delivery-line">Доставка {product.deliveryDays === 1 ? "завтра" : `за ${product.deliveryDays} дня`} · минимум {product.minOrder}</div>
-                {quantity === 0 ? (
-                  <button className="primary-button full" onClick={() => addToCart(product)}>В корзину</button>
-                ) : (
-                  <div className="quantity-control">
-                    <button onClick={() => changeQuantity(product.id, -1)}>−</button>
-                    <span>{quantity}</span>
-                    <button onClick={() => changeQuantity(product.id, 1)}>+</button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <aside className="cart-panel">
-        <div className="cart-header">
-          <div>
-            <span className="eyebrow">Текущий заказ</span>
-            <h2>Корзина</h2>
-          </div>
-          <span className="cart-count">{cartUnits}</span>
-        </div>
-
-        {cartLines.length === 0 ? (
-          <div className="empty-cart">
-            <div>🛒</div>
-            <h3>Корзина пока пуста</h3>
-            <p>Добавьте товары из каталога. Мы автоматически разделим заказ по поставщикам.</p>
-          </div>
-        ) : (
-          <>
-            <div className="cart-lines">
-              {cartLines.map((product) => (
-                <div className="cart-line" key={product.id}>
-                  <div className="cart-line-icon">{product.emoji}</div>
-                  <div className="cart-line-main">
-                    <b>{product.name}</b>
-                    <span>{money(product.price)} × {cart[product.id]}</span>
-                    <div className="mini-quantity">
-                      <button onClick={() => changeQuantity(product.id, -1)}>−</button>
-                      <span>{cart[product.id]}</span>
-                      <button onClick={() => changeQuantity(product.id, 1)}>+</button>
+          <div className="editor-scroll">
+            {panel === "content" && (
+              <div className="panel-stack">
+                <section className="editor-card profile-editor">
+                  <div className="card-heading">
+                    <div>
+                      <span className="section-kicker">Профиль</span>
+                      <h2>Первый экран</h2>
                     </div>
+                    <span className="profile-badge">MS</span>
                   </div>
-                  <strong>{money(product.price * cart[product.id])}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="cart-summary">
-              <div><span>Товаров</span><b>{cartUnits}</b></div>
-              <div><span>Поставщиков</span><b>{supplierCount}</b></div>
-              <div className="total-line"><span>Итого</span><b>{money(cartTotal)}</b></div>
-            </div>
-            <button className="primary-button full checkout-button">Оформить заказ</button>
-            <p className="cart-footnote">После оформления создадим {supplierCount} отдельных заказов поставщикам.</p>
-          </>
-        )}
 
-        <div className="delivery-card">
-          <span>🚚</span>
-          <div><b>Доставка в магазин</b><p>Алматы, мкр. Самал-2, 41</p></div>
-          <button>Изменить</button>
-        </div>
-      </aside>
-    </div>
-  );
-}
+                  <label>
+                    <span>Имя или бренд</span>
+                    <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
+                  </label>
+                  <label>
+                    <span>Адрес страницы</span>
+                    <div className="slug-input"><span>taply.me/</span><input value={profile.handle} onChange={(event) => setProfile({ ...profile, handle: event.target.value.replace(/\s/g, "-").toLowerCase() })} /></div>
+                  </label>
+                  <label>
+                    <span>Короткое описание</span>
+                    <textarea rows={3} value={profile.description} onChange={(event) => setProfile({ ...profile, description: event.target.value })} />
+                  </label>
+                </section>
 
-function SupplierView() {
-  const [selectedStatus, setSelectedStatus] = useState("Все");
-  const filteredOrders = selectedStatus === "Все"
-    ? supplierOrders
-    : supplierOrders.filter((order) => order.status === selectedStatus);
+                <section className="blocks-section">
+                  <div className="section-heading-row">
+                    <div><span className="section-kicker">Структура</span><h2>Блоки страницы</h2></div>
+                    <span>{blocks.length}</span>
+                  </div>
 
-  return (
-    <section className="supplier-page">
-      <div className="supplier-heading">
-        <div>
-          <span className="eyebrow">Кабинет поставщика</span>
-          <h1>Доброе утро, Food Distribution</h1>
-          <p>Следите за заказами, остатками и продажами в одном месте.</p>
-        </div>
-        <button className="primary-button">+ Добавить товар</button>
-      </div>
+                  <div className="block-list">
+                    {blocks.map((block, index) => (
+                      <article className={`block-row ${block.visible ? "" : "muted"}`} key={block.id}>
+                        <button className="drag-handle" aria-label="Переместить">⋮⋮</button>
+                        <div className={`block-icon kind-${block.kind}`}>{blockMeta[block.kind].icon}</div>
+                        <div className="block-copy">
+                          <span>{blockMeta[block.kind].label}</span>
+                          <b>{block.title}</b>
+                          <small>{block.price ?? block.subtitle}</small>
+                        </div>
+                        <div className="block-actions">
+                          <button onClick={() => moveBlock(block.id, -1)} disabled={index === 0} aria-label="Поднять">↑</button>
+                          <button onClick={() => moveBlock(block.id, 1)} disabled={index === blocks.length - 1} aria-label="Опустить">↓</button>
+                          <button className={`visibility-toggle ${block.visible ? "on" : ""}`} onClick={() => toggleBlock(block.id)} aria-label="Показать или скрыть"><i /></button>
+                          <button className="remove-button" onClick={() => removeBlock(block.id)} aria-label="Удалить">×</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
 
-      <div className="stats-grid">
-        <StatCard label="Заказы сегодня" value="12" detail="+18% к прошлому дню" />
-        <StatCard label="GMV за июнь" value="4,82 млн ₸" detail="74% от плана" />
-        <StatCard label="Активные магазины" value="86" detail="+9 за этот месяц" />
-        <StatCard label="Товары заканчиваются" value="7" detail="Требуют пополнения" warning />
-      </div>
+                <section className="add-section">
+                  <span className="section-kicker">Добавить блок</span>
+                  <div className="add-grid">
+                    {(Object.keys(blockMeta) as BlockKind[]).map((kind) => (
+                      <button key={kind} onClick={() => addBlock(kind)}>
+                        <span className={`add-icon kind-${kind}`}>{blockMeta[kind].icon}</span>
+                        <b>{blockMeta[kind].label}</b>
+                        <small>{kind === "product" ? "Файл или товар" : kind === "service" ? "Запись и оплата" : kind === "promo" ? "CPA или фикс" : "Любой переход"}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
 
-      <div className="supplier-layout">
-        <div className="orders-card">
-          <div className="card-heading">
-            <div><h2>Заказы магазинов</h2><p>Последние заявки на поставку</p></div>
-            <button className="secondary-button">Экспорт</button>
-          </div>
-          <div className="status-tabs">
-            {["Все", "Новый", "Подтверждён", "Собирается", "Завершён"].map((status) => (
-              <button key={status} className={selectedStatus === status ? "active" : ""} onClick={() => setSelectedStatus(status)}>{status}</button>
-            ))}
-          </div>
-          <div className="orders-table-wrap">
-            <table>
-              <thead><tr><th>Заказ</th><th>Магазин</th><th>Состав</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td><b>{order.id}</b><small>{order.createdAt}</small></td>
-                    <td><b>{order.store}</b><small>{order.address}</small></td>
-                    <td>{order.items} позиций</td>
-                    <td><b>{money(order.total)}</b></td>
-                    <td><span className={`status status-${order.status.toLowerCase().replace("ё", "е")}`}>{order.status}</span></td>
-                    <td><button className="icon-button">→</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            {panel === "design" && (
+              <div className="panel-stack">
+                <section className="editor-card">
+                  <div className="card-heading"><div><span className="section-kicker">Стиль</span><h2>Тема страницы</h2></div></div>
+                  <div className="theme-grid">
+                    {themeOptions.map((option) => (
+                      <button key={option.id} className={`theme-option preview-${option.id} ${theme === option.id ? "selected" : ""}`} onClick={() => setTheme(option.id)}>
+                        <span className="theme-demo"><i /><i /><i /></span>
+                        <b>{option.name}</b>
+                        <small>{option.note}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
 
-        <aside className="side-stack">
-          <div className="insight-card">
-            <span className="insight-icon">↗</span>
-            <div className="eyebrow">Возможность роста</div>
-            <h3>7 товаров часто ищут магазины, но у вас их нет</h3>
-            <p>Добавление этих SKU может принести около 480 000 ₸ дополнительного GMV в месяц.</p>
-            <button>Посмотреть товары</button>
-          </div>
-          <div className="quick-card">
-            <h3>Быстрые действия</h3>
-            <button><span>▤</span> Загрузить товары из Excel <b>→</b></button>
-            <button><span>◫</span> Обновить остатки <b>→</b></button>
-            <button><span>⌁</span> Настроить доставку <b>→</b></button>
+                <section className="editor-card">
+                  <div className="card-heading"><div><span className="section-kicker">Форма</span><h2>Скругление карточек</h2></div></div>
+                  <div className="radius-switch">
+                    {(["square", "soft", "round"] as RadiusId[]).map((item) => (
+                      <button key={item} className={radius === item ? "selected" : ""} onClick={() => setRadius(item)}>
+                        <span className={`radius-sample sample-${item}`} />
+                        {item === "square" ? "Строго" : item === "soft" ? "Мягко" : "Кругло"}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="editor-card font-card">
+                  <div><span className="section-kicker">Типографика</span><h2>Manrope</h2><p>Хорошо читается на кириллице и маленьких экранах.</p></div>
+                  <span className="font-preview">Аа</span>
+                </section>
+              </div>
+            )}
+
+            {panel === "settings" && (
+              <div className="panel-stack">
+                <section className="editor-card settings-card">
+                  <div className="card-heading"><div><span className="section-kicker">Продажи</span><h2>Приём заказов</h2></div><span className="connected-pill">Подключено</span></div>
+                  <div className="setting-row"><div><b>Kaspi QR</b><span>Показывать QR после оформления</span></div><button className="switch on"><i /></button></div>
+                  <div className="setting-row"><div><b>Заявка в WhatsApp</b><span>Дублировать новый заказ владельцу</span></div><button className="switch on"><i /></button></div>
+                  <div className="setting-row"><div><b>Оплата картой</b><span>Подключить интернет-эквайринг</span></div><button className="connect-link">Подключить</button></div>
+                </section>
+
+                <section className="editor-card settings-card">
+                  <div className="card-heading"><div><span className="section-kicker">Монетизация</span><h2>Рекламные размещения</h2></div></div>
+                  <div className="setting-row"><div><b>Открыт для предложений</b><span>Бренды смогут присылать заявки</span></div><button className="switch on"><i /></button></div>
+                  <div className="setting-row"><div><b>Минимальная цена</b><span>За одно размещение</span></div><strong>35 000 ₸</strong></div>
+                </section>
+
+                <section className="editor-card domain-card">
+                  <span className="section-kicker">Домен</span>
+                  <h2>{profile.handle || "your-name"}.taply.me</h2>
+                  <p>Можно подключить собственный домен после публикации.</p>
+                  <button className="outline-button">Подключить домен</button>
+                </section>
+              </div>
+            )}
           </div>
         </aside>
-      </div>
-    </section>
-  );
-}
 
-function StatCard({ label, value, detail, warning = false }: { label: string; value: string; detail: string; warning?: boolean }) {
-  return (
-    <article className={`stat-card ${warning ? "warning" : ""}`}>
-      <span>{label}</span>
-      <b>{value}</b>
-      <small>{detail}</small>
-    </article>
+        <section className={`preview-stage ${mobileView === "preview" ? "mobile-active" : ""}`}>
+          <div className="preview-toolbar">
+            <div className="device-switch"><button className="active">Телефон</button><button>Планшет</button></div>
+            <span className="preview-url">taply.me/{profile.handle || "your-name"}</span>
+            <button className="open-button" onClick={() => notify("Предпросмотр открыт")}>↗</button>
+          </div>
+
+          <div className="phone-wrap">
+            <div className="phone-frame">
+              <div className="phone-speaker" />
+              <div className="phone-screen">
+                <div className="public-page">
+                  <header className="public-profile">
+                    <div className="public-avatar">MS<span /></div>
+                    <div className="public-title-row"><h2>{profile.name || "Ваше имя"}</h2><span>✓</span></div>
+                    <p>{profile.description}</p>
+                    <div className="social-row"><button>TG</button><button>IG</button><button>WA</button></div>
+                  </header>
+
+                  <div className="public-blocks">
+                    {visibleBlocks.map((block) => (
+                      <article className={`public-block public-${block.kind}`} key={block.id}>
+                        <div className={`public-block-art kind-${block.kind}`}>{blockMeta[block.kind].icon}</div>
+                        <div className="public-block-copy">
+                          <div className="public-block-top">
+                            <span>{blockMeta[block.kind].label}</span>
+                            {block.badge && <em>{block.badge}</em>}
+                          </div>
+                          <h3>{block.title}</h3>
+                          <p>{block.subtitle}</p>
+                          {block.price && <b>{block.price}</b>}
+                        </div>
+                        <button className="public-arrow">→</button>
+                      </article>
+                    ))}
+                  </div>
+
+                  <footer className="public-footer"><span className="mini-logo">t</span> Сделано в taply</footer>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="preview-note">
+            <span>⚡</span>
+            <div><b>Сначала мобильный экран</b><p>Все блоки сразу проверяются в размере, где их увидят ваши покупатели.</p></div>
+          </div>
+        </section>
+      </section>
+
+      <nav className="mobile-bottom-nav">
+        <button className={mobileView === "edit" ? "active" : ""} onClick={() => setMobileView("edit")}><span>✎</span>Редактор</button>
+        <button className={mobileView === "preview" ? "active" : ""} onClick={() => setMobileView("preview")}><span>◉</span>Просмотр</button>
+        <button className="mobile-publish" onClick={publish}><span>↑</span>Публикация</button>
+      </nav>
+    </main>
   );
 }
